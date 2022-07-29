@@ -19,8 +19,6 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE); //Di
 
 //Sensor Settings
 Adafruit_BME280 bme;  //Sensor
-/*float temp;
-float humi;*/
 
 //Wifi Settings
 const char* ssid = "Bashers Kingdom";
@@ -31,14 +29,13 @@ const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 7200;
 const int   daylightOffset_sec = 3600;
 
-
 struct stats
 {
   float temp; //Temperatur in °C
   float humi; //Luftfeuchte in %
   int sensor = OFF; //0-OK ; 1-Failure
   int wifi = OFF;   //0-OK ; 1-Connecting ; 2-Failure
-} ;
+};
 stats s;
 
 void printValues() {
@@ -97,8 +94,9 @@ void displayStats(stats s){
       break;
 
     case OK:
-      strcat(wifi_str, "OK"); break;
+      strcat(wifi_str, "OK");
       displayWifi = false;
+      break;
 
     case OFF:
       strcat(wifi_str, "OFF"); 
@@ -109,8 +107,8 @@ void displayStats(stats s){
       strcat(wifi_str, "UNKNOW"); 
       displayWifi = true;
   }
-  Serial.print("Wifi_str: ");
-  Serial.println(wifi_str);
+  /*Serial.print("Wifi_str: ");
+  Serial.println(wifi_str);*/
 
   switch(s.sensor){    // Sensorstatus anzeigen oder nicht
       case OFF:
@@ -170,11 +168,22 @@ void displayStats(stats s){
   } while ( u8g2.nextPage() );
 
   //Debugging
+  /*
   Serial.println(" ------ Debugging DisplayStats ---------");
   Serial.print("-- Sensor_str: "); Serial.println(sensor_str);
   Serial.print("-- warnungen: "); Serial.print(warnings); Serial.print (" --- Größe: "); Serial.println( strlen(warnings));
   Serial.print("-- OffsetCnt :"); Serial.println(offsetcnt);
   Serial.print("-- u: "); Serial.println(u);
+  */
+}
+
+void displayString(char* string){
+  u8g2.firstPage(); //Display leeren
+  do {
+      u8g2.setFont(u8g2_font_fur11_tf);
+      u8g2.drawStr(0, 16 ,string);
+      
+  } while ( u8g2.nextPage() );
 }
 
 // -------------------------------------------------------------------------------------------
@@ -183,42 +192,50 @@ void displayStats(stats s){
 void setup() { 
 
   //Start
-  Serial.begin(115200);
-  delay(200);
   Serial.println("Begin Program...");
 
+  Serial.println("Setup...");
+  Serial.begin(115200);
+  delay(200);
+  
   //Setup Display
+  Serial.println("-Display...");
   u8g2.begin();
 
   //Setup Sensor
+  Serial.println("-Sensor");
   bool status;
   status = bme.begin(0x76);
   if(!status) {
-    Serial.println("Couldnt find Sensor");
+    Serial.println("--Couldnt find Sensor");
     s.sensor = SENSORFAIL;
   } else {
-    Serial.println("Sensor gefunden");
+    Serial.println("--Sensor gefunden");
     s.sensor = OK;
   }
-  Serial.println("bla");
-  Serial.println ("-- Setup Complete--");
+  delay(1000);
 
-  delay(1000);  
-
-  /*setup Wifi
-  /Serial.print("Connecting to ");
+  //Setup WiFi
+  Serial.println("-Wifi");
+  
+  Serial.print("--Connecting to ");
   Serial.println(ssid);
 
   WiFi.begin(ssid, password);
+  s.wifi = WIFICONNECTING;
   while (WiFi.status() != WL_CONNECTED) {
-  delay(500);
-  Serial.print(".");
-  } */
+    delay(500);
+    Serial.print(".");
+
+    displayString("Wifi Connecting");
+  }
+  s.wifi = OK;
+  Serial.println (" +++ Setup Complete +++");
 }
 
 void loop() { 
 
-  int delayTime = 200;
+  int delayTime = 500;
 
   //get SensorValues
   s.temp = bme.readTemperature();
