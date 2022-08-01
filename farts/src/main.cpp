@@ -8,6 +8,7 @@
 #include <stdbool.h>
 
 #define SEALEVELPRESSURE_HPA 1025
+
 #define OFF -1
 #define OK 0
 #define WIFICONNECTING 1
@@ -177,7 +178,7 @@ void displayStats(stats s){
   */
 }
 
-void displayString(char* string){
+void displayString(const char* string){
   u8g2.firstPage(); //Display leeren
   do {
       u8g2.setFont(u8g2_font_fur11_tf);
@@ -227,7 +228,7 @@ void setup() {
     delay(500);
     Serial.print(".");
 
-    displayString("Wifi Connecting");
+    displayString("Wifi Connecting...");
   }
   s.wifi = OK;
   Serial.println (" +++ Setup Complete +++");
