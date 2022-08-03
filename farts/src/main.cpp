@@ -6,6 +6,7 @@
 #include <WiFi.h>
 #include "time.h"
 #include <stdbool.h>
+#include <PubSubClient.h>
 
 #define SEALEVELPRESSURE_HPA 1025
 
@@ -25,6 +26,14 @@ Adafruit_BME280 bme;  //Sensor
 const char* ssid = "Bashers Kingdom";
 const char* password = "scheisse23";
 
+//MQTT Settings
+const char* mqtt_server="192.168.178.25";
+WiFiClient espClient;
+PubSubClient client(espClient);
+long lastMsg = 0;
+char mqtt_msg[50];
+int value = 0;
+
 //Time Settings
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 7200;
@@ -36,6 +45,7 @@ struct stats
   float humi; //Luftfeuchte in %
   int sensor = OFF; //0-OK ; 1-Failure
   int wifi = OFF;   //0-OK ; 1-Connecting ; 2-Failure
+  int mqtt = OFF;   //0-OK ; 1-Connecting ; 2-Failure
 };
 stats s;
 
@@ -136,7 +146,7 @@ void displayStats(stats s){
   sprintf(humi_str, "Humi: %.2f", s.humi);
 
   //Anzeigen
-  char warnings[100] = "";
+  char warnings[100] = "\0";
 
   int u;
   u8g2.firstPage(); //Display leeren
@@ -168,14 +178,6 @@ void displayStats(stats s){
 
   } while ( u8g2.nextPage() );
 
-  //Debugging
-  /*
-  Serial.println(" ------ Debugging DisplayStats ---------");
-  Serial.print("-- Sensor_str: "); Serial.println(sensor_str);
-  Serial.print("-- warnungen: "); Serial.print(warnings); Serial.print (" --- Größe: "); Serial.println( strlen(warnings));
-  Serial.print("-- OffsetCnt :"); Serial.println(offsetcnt);
-  Serial.print("-- u: "); Serial.println(u);
-  */
 }
 
 void displayString(const char* string){
@@ -214,13 +216,12 @@ void setup() {
     Serial.println("--Sensor gefunden");
     s.sensor = OK;
   }
-  delay(1000);
 
   //Setup WiFi
   Serial.println("-Wifi");
   
   Serial.print("--Connecting to ");
-  Serial.println(ssid);
+  Serial.print(ssid);
 
   WiFi.begin(ssid, password);
   s.wifi = WIFICONNECTING;
@@ -231,12 +232,26 @@ void setup() {
     displayString("Wifi Connecting...");
   }
   s.wifi = OK;
-  Serial.println (" +++ Setup Complete +++");
+  Serial.println();
+
+  //Setup MQTT
+  Serial.println("-MQTT");
+  client.setServer(mqtt_server, 1883);
+  Serial.print("--Connect MQTT");
+  while (!client.connected()) {
+    client.connect("TestConnection");
+    displayString("MQTT Connect...");
+    delay(500);
+  }
+  Serial.println();
+  Serial.println("--MQTT Broker connected.");
+
+Serial.println (" +++ Setup Complete +++"); 
 }
 
 void loop() { 
 
-  int delayTime = 500;
+  int delayTime = 5000;
 
   //get SensorValues
   s.temp = bme.readTemperature();
@@ -245,5 +260,19 @@ void loop() {
   printStats(s);
   displayStats(s);
 
+  if (client.connected()){
+
+    //strcpy(mqtt_msg, "TestString");
+    sprintf(mqtt_msg, "%.2f", s.temp);
+    Serial.print("Publishing "); Serial.println(mqtt_msg);
+    client.publish("/esp32/temp", mqtt_msg);
+
+    sprintf(mqtt_msg, "%.2f", s.humi);
+    Serial.print("Publishing "); Serial.println(mqtt_msg);
+    client.publish("/esp32/humi", mqtt_msg);
+    
+  } else{
+    Serial.println("Client not connected");
+  }
   delay(delayTime);
 }
