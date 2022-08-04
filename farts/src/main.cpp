@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <connections.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include <U8g2lib.h>
@@ -14,7 +13,6 @@
 #define OK 0
 #define CONNECTING 2
 #define ERROR 1
-//#define SENSORFAIL 1
 
 //Display Setting
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE); //Display
@@ -30,7 +28,7 @@ const char* password = "scheisse23";
 const char* mqtt_server="192.168.178.25";
 WiFiClient espClient;
 PubSubClient client(espClient);
-char mqtt_msg[50];
+//char mqtt_msg[50];
 
 //time Settings
 const char* ntpServer = "pool.ntp.org";
@@ -43,6 +41,7 @@ struct stats
   float temp; //Temperatur in °C
   float humi; //Luftfeuchte in %
   char time[10]; //aktuelle Uhrzeit
+  char date[10]; //aktuelles Datum
   int sensor = OFF; //0-OK ; 1-Failure
   int wifi = OFF;   //0-OK ; 1-Connecting ; 2-Failure
   int mqtt = OFF;   //0-OK ; 1-Connecting ; 2-Failure
@@ -170,7 +169,6 @@ void displayStats(stats s){
     u8g2.drawStr(0, offsetcnt * offset ,temp_str); offsetcnt++;
     u8g2.drawStr(0, offsetcnt * offset ,humi_str); offsetcnt++;
     
-
     if (u > ( 127 + strlen(warnings)*7) ) {
       u = 0;
     }
@@ -188,7 +186,7 @@ void displayString(const char* string){
   } while ( u8g2.nextPage() );
 }
 
-void getCurrentTime(char *time){
+void getCurrentTimeAndDate(char *time, char *date){
 //  char *currentTime;
 
     //get timestatus
@@ -201,6 +199,36 @@ void getCurrentTime(char *time){
    }
 
   sprintf(time, "%i:%i:%i", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+  sprintf(date, "%i.%i", timeinfo.tm_mday, timeinfo.tm_mon+1);
+}
+
+void publishValues(PubSubClient &client, stats &s){
+
+  char mqtt_msg[50];
+
+  if (client.connected()){
+
+    //strcpy(mqtt_msg, "TestString");
+    sprintf(mqtt_msg, "%.2f", s.temp);
+    Serial.print("Publishing "); Serial.println(mqtt_msg);
+    client.publish("/esp32/temp", mqtt_msg);
+
+    sprintf(mqtt_msg, "%.2f", s.humi);
+    Serial.print("Publishing "); Serial.println(mqtt_msg);
+    client.publish("/esp32/humi", mqtt_msg);
+
+    sprintf(mqtt_msg, "%s", s.time );
+    Serial.print("Publishing "); Serial.println(mqtt_msg);
+    client.publish("/esp32/time", mqtt_msg);
+
+    sprintf(mqtt_msg, "%s", s.date );
+    Serial.print("Publishing "); Serial.println(mqtt_msg);
+    client.publish("/esp32/date", mqtt_msg);
+  
+  } else{
+    s.mqtt = ERROR;
+    Serial.println("Client not connected");
+  }
 }
 
 // -------------------------------------------------------------------------------------------
@@ -275,25 +303,12 @@ void loop() {
   //get Values
   s.temp = bme.readTemperature();
   s.humi = bme.readHumidity();
-  getCurrentTime(s.time);
+  getCurrentTimeAndDate(s.time, s.date);
+
+  publishValues(client, s);
 
   printStats(s);
   displayStats(s);
 
-  if (client.connected()){
-
-    //strcpy(mqtt_msg, "TestString");
-    sprintf(mqtt_msg, "%.2f", s.temp);
-    Serial.print("Publishing "); Serial.println(mqtt_msg);
-    client.publish("/esp32/temp", mqtt_msg);
-
-    sprintf(mqtt_msg, "%.2f", s.humi);
-    Serial.print("Publishing "); Serial.println(mqtt_msg);
-    client.publish("/esp32/humi", mqtt_msg);
-    
-  } else{
-    s.mqtt = ERROR;
-    Serial.println("Client not connected");
-  }
   delay(delaytime);
 }
