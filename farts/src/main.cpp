@@ -12,9 +12,9 @@
 
 #define OFF -1
 #define OK 0
-#define WIFICONNECTING 1
-#define WIFIFAIL 2
-#define SENSORFAIL 1
+#define CONNECTING 2
+#define ERROR 1
+//#define SENSORFAIL 1
 
 //Display Setting
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE); //Display
@@ -77,6 +77,9 @@ void printStats(stats s) {
   Serial.print("WiFistatus : ");
   Serial.println(s.wifi);
 
+  Serial.print("mqttStatus :");
+  Serial.println(s.mqtt);
+
   Serial.print("temp : ");
   Serial.println(s.temp);
 
@@ -94,12 +97,12 @@ void displayStats(stats s){
   char sensor_str[20] = "Sensor: ";
 
   switch(s.wifi){ //Wifi anzeigen oder nicht
-    case WIFICONNECTING:
+    case CONNECTING:
       strcat(wifi_str, "Connecting...") ; 
       displayWifi = true; 
       break;
     
-    case WIFIFAIL:
+    case ERROR:
       strcat(wifi_str, "ERROR") ; 
       displayWifi = true; 
       break;
@@ -130,7 +133,7 @@ void displayStats(stats s){
         strcat(sensor_str, "OK");
         displaySensor = false;
         break;
-      case SENSORFAIL:
+      case ERROR:
         strcat(sensor_str, "ERROR");
         displaySensor = true;
         break;
@@ -148,7 +151,7 @@ void displayStats(stats s){
   //Anzeigen
   char warnings[100] = "\0";
 
-  int u;
+  int u = 0;
   u8g2.firstPage(); //Display leeren
   do {
       u8g2.setFont(u8g2_font_fur11_tf);
@@ -211,7 +214,7 @@ void setup() {
   status = bme.begin(0x76);
   if(!status) {
     Serial.println("--Couldnt find Sensor");
-    s.sensor = SENSORFAIL;
+    s.sensor = ERROR;
   } else {
     Serial.println("--Sensor gefunden");
     s.sensor = OK;
@@ -224,7 +227,7 @@ void setup() {
   Serial.print(ssid);
 
   WiFi.begin(ssid, password);
-  s.wifi = WIFICONNECTING;
+  s.wifi = CONNECTING;
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -239,10 +242,12 @@ void setup() {
   client.setServer(mqtt_server, 1883);
   Serial.print("--Connect MQTT");
   while (!client.connected()) {
+    s.mqtt = CONNECTING;
     client.connect("TestConnection");
     displayString("MQTT Connect...");
     delay(500);
   }
+  s.mqtt = OK;
   Serial.println();
   Serial.println("--MQTT Broker connected.");
 
@@ -272,6 +277,7 @@ void loop() {
     client.publish("/esp32/humi", mqtt_msg);
     
   } else{
+    s.mqtt = ERROR;
     Serial.println("Client not connected");
   }
   delay(delayTime);
