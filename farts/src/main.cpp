@@ -30,46 +30,31 @@ const char* password = "scheisse23";
 const char* mqtt_server="192.168.178.25";
 WiFiClient espClient;
 PubSubClient client(espClient);
-long lastMsg = 0;
 char mqtt_msg[50];
-int value = 0;
 
-//Time Settings
+//time Settings
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 7200;
-const int   daylightOffset_sec = 3600;
+//const int   daylightOffset_sec = 3600;
+const int   daylightOffset_sec = 0;
 
 struct stats
 {
   float temp; //Temperatur in °C
   float humi; //Luftfeuchte in %
+  char time[10]; //aktuelle Uhrzeit
   int sensor = OFF; //0-OK ; 1-Failure
   int wifi = OFF;   //0-OK ; 1-Connecting ; 2-Failure
   int mqtt = OFF;   //0-OK ; 1-Connecting ; 2-Failure
+  int timestatus = OFF;
 };
 stats s;
 
-void printValues() {
-  Serial.print("Temperature = ");
-  Serial.print(bme.readTemperature());
-  Serial.println(" *C");
-  
-  Serial.print("Pressure = ");
-  Serial.print(bme.readPressure() / 100.0F);
-  Serial.println(" hPa");
-
-  Serial.print("Approx. Altitude = ");
-  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
-  Serial.println(" m");
-
-  Serial.print("Humidity = ");
-  Serial.print(bme.readHumidity());
-  Serial.println(" %");
-
-  Serial.println();
-}
-
 void printStats(stats s) {
+
+  Serial.println("###########################");
+  Serial.println("+++++++   Stats +++++++++++");
+  Serial.println("###########################");
 
   Serial.print("Sensorstatus : ");
   Serial.println(s.sensor);
@@ -80,11 +65,20 @@ void printStats(stats s) {
   Serial.print("mqttStatus :");
   Serial.println(s.mqtt);
 
+  Serial.print("timestatusStatus : ");
+  Serial.println(s.timestatus);
+
   Serial.print("temp : ");
   Serial.println(s.temp);
 
   Serial.print("Humi : ");
   Serial.println(s.humi);
+
+  Serial.print("Zeit: ");
+  Serial.println(s.time);
+
+  Serial.println("###########################");
+  Serial.println();
 }
 
 void displayStats(stats s){
@@ -172,8 +166,10 @@ void displayStats(stats s){
       u+=5;
     }
 
-    u8g2.drawStr(0, offsetcnt*offset ,temp_str); offsetcnt++;
-    u8g2.drawStr(0,offsetcnt *offset ,humi_str); offsetcnt++;
+    u8g2.drawStr(28, offsetcnt * offset ,s.time); offsetcnt++;
+    u8g2.drawStr(0, offsetcnt * offset ,temp_str); offsetcnt++;
+    u8g2.drawStr(0, offsetcnt * offset ,humi_str); offsetcnt++;
+    
 
     if (u > ( 127 + strlen(warnings)*7) ) {
       u = 0;
@@ -190,6 +186,21 @@ void displayString(const char* string){
       u8g2.drawStr(0, 16 ,string);
       
   } while ( u8g2.nextPage() );
+}
+
+void getCurrentTime(char *time){
+//  char *currentTime;
+
+    //get timestatus
+  struct tm timeinfo;
+  if(!getLocalTime(&timeinfo)){
+    //Serial.println("Failed to obtain timestatus");
+    s.timestatus = ERROR;
+  } else {
+    s.timestatus = OK;
+   }
+
+  sprintf(time, "%i:%i:%i", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
 }
 
 // -------------------------------------------------------------------------------------------
@@ -237,6 +248,9 @@ void setup() {
   s.wifi = OK;
   Serial.println();
 
+  //Setup timestatus
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
   //Setup MQTT
   Serial.println("-MQTT");
   client.setServer(mqtt_server, 1883);
@@ -256,11 +270,12 @@ Serial.println (" +++ Setup Complete +++");
 
 void loop() { 
 
-  int delayTime = 5000;
+  int delaytime = 1000;
 
-  //get SensorValues
+  //get Values
   s.temp = bme.readTemperature();
   s.humi = bme.readHumidity();
+  getCurrentTime(s.time);
 
   printStats(s);
   displayStats(s);
@@ -280,5 +295,5 @@ void loop() {
     s.mqtt = ERROR;
     Serial.println("Client not connected");
   }
-  delay(delayTime);
+  delay(delaytime);
 }
