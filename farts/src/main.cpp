@@ -16,6 +16,7 @@
 
 //Display Setting
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE); //Display
+int u = 0;
 
 //Sensor Settings
 Adafruit_BME280 bme;  //Sensor
@@ -84,10 +85,30 @@ void displayStats(stats s){
 
   int offsetcnt = 1;        //wie oft soll Offset verwendet werden
   const int offset = 16;    //Fontgröße
-  bool displayWifi, displaySensor;
-
-  char wifi_str[20] = "Wifi: ";
+  bool displayWifi, displaySensor, displayMQTT = false;
   char sensor_str[20] = "Sensor: ";
+  char wifi_str[20] = "Wifi: ";
+  char mqtt_str[20] = "MQTT: ";
+  
+  switch(s.mqtt){ //MQTT Warning anzeigen oder nicht
+    case OFF:
+      displayMQTT = true; 
+      strcat(mqtt_str, "OFF");
+      break;
+
+    case CONNECTING:
+      displayMQTT = true;
+      strcat(mqtt_str, "CONNECTING");
+      break;
+
+    case OK:
+      displayMQTT = false;
+      break;
+
+    default:
+      displayMQTT = false;
+      break;
+  }
 
   switch(s.wifi){ //Wifi anzeigen oder nicht
     case CONNECTING:
@@ -144,7 +165,6 @@ void displayStats(stats s){
   //Anzeigen
   char warnings[100] = "\0";
 
-  int u = 0;
   u8g2.firstPage(); //Display leeren
   do {
       u8g2.setFont(u8g2_font_fur11_tf);
@@ -160,8 +180,19 @@ void displayStats(stats s){
       strcat(warnings, sensor_str);
     }
 
+    if (displayMQTT){
+      if (strlen(warnings) > 0) {
+        strcat(warnings, " -- ");
+      }
+      strcat(warnings, mqtt_str);
+    }
+
+    Serial.print("--------DEBUGMSG: "); Serial.println(warnings);
+
     if (strlen(warnings) > 0 ) {
       u8g2.drawStr(127-u, offsetcnt*offset,warnings); offsetcnt++;  
+      Serial.print("___DEBUGMSG: u="); Serial.println(u);
+      //u8g2.drawStr(0, offsetcnt*offset,warnings); offsetcnt++;  
       u+=5;
     }
 
@@ -169,7 +200,7 @@ void displayStats(stats s){
     u8g2.drawStr(0, offsetcnt * offset ,temp_str); offsetcnt++;
     u8g2.drawStr(0, offsetcnt * offset ,humi_str); offsetcnt++;
     
-    if (u > ( 127 + strlen(warnings)*7) ) {
+    if (u > ( 127 + strlen(warnings)*8) ) {
       u = 0;
     }
 
